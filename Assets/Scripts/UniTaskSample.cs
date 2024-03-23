@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data;
 using System.Net;
 using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
@@ -12,12 +13,29 @@ public class UniTaskSample : MonoBehaviour
 {
     readonly string uri = "https://gamecodeschool.com/wp-content/uploads/2015/06/bob.png";
     public Image downLoadImage;
-    public Button btnDownloadImage;
+    public Button btnDownloadImage, btnUniTaskCompletionSource;
+
+
+    private bool isRunning = false;
+    private float distance;
+    public float speed = 5f;
+    const float targetPositionX = 10f;
+    public GameObject ball;
 
     // Start is called before the first frame update
     void Start()
     {
         btnDownloadImage.onClick.AddListener(UniTask.UnityAction(DownloadImage));
+        btnUniTaskCompletionSource.onClick.AddListener(UniTask.UnityAction(OnUtcsExampleAsync));
+    }
+
+    private void Update()
+    {
+        if (isRunning)
+        {
+            distance = speed * Time.deltaTime;
+            ball.transform.Translate(distance, 0, 0);
+        }
     }
 
     private async UniTaskVoid DownloadImage()
@@ -54,4 +72,26 @@ public class UniTaskSample : MonoBehaviour
             }
         }
     }
+
+    private async UniTaskVoid OnUtcsExampleAsync()
+    {
+        UniTaskCompletionSource utcs = new UniTaskCompletionSource();
+        var progress = Progress.Create<float>((p) => { Debug.Log((int)(p * 100)); });
+        MoveBall(utcs, progress).Forget();
+        await utcs.Task;
+        ball.transform.position = new Vector3(0, 5, 5);
+    }
+
+    private async UniTaskVoid MoveBall(UniTaskCompletionSource utcs, IProgress<float> progress)
+    {
+        isRunning = true;
+        while (ball.transform.position.x <= targetPositionX)
+        {
+            await UniTask.Yield();
+            progress.Report(ball.transform.position.x / targetPositionX);
+        }
+        isRunning = false;
+        utcs.TrySetResult();
+    }
 }
+
